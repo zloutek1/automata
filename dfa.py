@@ -124,7 +124,7 @@ class DFA(FA):
     def table(self):
         super().table(self.table_body)
 
-    def normalize(self):
+    def normalize(self, step=0, minimalize_until=None):
         """
         1. add hell if necessary
         2. remove unreachable nodes
@@ -143,6 +143,9 @@ class DFA(FA):
                         hell_index for i in self.alphabet)
                 self.func[key] = hell_index
 
+        if step == 1:
+            return self
+
         # get reachables
         index = 0
         reachable = [self.initial_state]
@@ -160,7 +163,13 @@ class DFA(FA):
             for letter in self.alphabet:
                 del self.func[state, letter]
 
-        min_dfs = self.minimalize()
+        if step == 2:
+            return self
+
+        min_dfs = self.minimalize(minimalize_until=minimalize_until)
+
+        if step == 3:
+            return min_dfs
 
         # order and rename
         new_δ = DTransitionFunction(self.alphabet)
@@ -188,9 +197,10 @@ class DFA(FA):
         new_states = list(letterMapping.values())
         new_accepting = {letterMapping[state]
                          for state in min_dfs.accepted_sates}
+
         return DFA(new_states, min_dfs.alphabet, new_δ, new_states[0], new_accepting)
 
-    def minimalize(self, step=0, groups=None, func=None):
+    def minimalize(self, step=0, minimalize_until=None, groups=None, func=None):
         """
         1. iteration:
             separate into two groups (non-accepting, accepting)
@@ -200,6 +210,13 @@ class DFA(FA):
             assign to each transition value cooresponding to target's group
         repeat until not change happened
         """
+
+        if minimalize_until == step - 1:
+            groups = {group: [key for key in groups if groups[key] == group]
+                      for group in groups.values()}
+            states = sum(groups.values(), [])
+
+            return DFA(states, self.alphabet, func, self.initial_state, self.accepted_sates)
 
         if step == 0:
             groups = {
@@ -213,7 +230,7 @@ class DFA(FA):
                 for letter in self.alphabet:
                     func[state, letter] = groups.get(self.func[state, letter])
 
-            return self.minimalize(step + 1, groups, func)
+            return self.minimalize(step + 1, minimalize_until, groups, func)
 
         new_groups = {}
         force_move = 0
@@ -235,7 +252,7 @@ class DFA(FA):
                     self.func[state, letter])
 
         if groups != new_groups and func != new_func:
-            return self.minimalize(step + 1, new_groups, new_func)
+            return self.minimalize(step + 1, minimalize_until, new_groups, new_func)
 
         ##
         # construct final automata
@@ -464,64 +481,3 @@ class NDTransitionFunction(dict):
             return
 
         raise NotImplementedError()
-
-
-"""
-Q = range(1, 13)
-Σ = {"a", "b"}
-δ = DTransitionFunction(Σ)
-A = DFA(Q, Σ, δ, 2, {4, 7})
-δ[1] = 3, 1
-δ[2] = 9, 4
-δ[3] = None, 1
-δ[4] = 9, 4
-δ[5] = 8, 5
-δ[6] = 5, 4
-δ[7] = 6, 9
-δ[8] = 11, None
-δ[9] = 7, 9
-δ[10] = 12, 3
-δ[11] = 8, 1
-δ[12] = None, 10
-
-A.table()
-A.diagram()
-B = A.normalize()
-B.table()
-B.diagram()
-"""
-
-"""
-Q = range(0, 4 + 1)
-Σ = {"a", "b", "c", "d"}
-δ = NDTransitionFunction(Σ, epsilon=True)
-δ[0] = None, None, None, None, 1
-δ[1] = 0, None, None, 3, 2
-δ[2] = 3, None, None, None, None
-δ[3] = None, None, None, 4, 4
-δ[4] = None, 3, 2, None, None
-A = NFA(Q, Σ, δ, 0, {2})
-B = A.toNFA()
-B.table()
-B.diagram()
-"""
-
-Q = range(1, 10 + 1)
-Σ = {"a", "b"}
-δ = DTransitionFunction(Σ)
-A = DFA(Q, Σ, δ, 5, {2, 6})
-δ[1] = 4, 1
-δ[2] = 8, 8
-δ[3] = 4, 3
-δ[4] = 2, 6
-δ[5] = 2, 6
-δ[6] = 3, 3
-δ[7] = 4, 3
-δ[8] = 10, 3
-δ[9] = 3, 6
-δ[10] = 10, 1
-A.table()
-A.diagram()
-B = A.normalize()
-B.table()
-B.diagram()
