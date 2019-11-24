@@ -1,4 +1,9 @@
 from collections.abc import Iterable
+from itertools import chain, combinations
+
+
+def all_subsets(ss):
+    return chain(*map(lambda x: combinations(ss, x), range(0, len(ss) + 1)))
 
 
 def roman(num):
@@ -30,7 +35,7 @@ class Set:
 
     def __init__(self, *args):
 
-        if len(args) == 1 and isinstance(args[0], Iterable) and type(args[0]) not in (Set, str):
+        if len(args) == 1 and isinstance(args[0], Iterable) and type(args[0]) not in (Set, str, Rule):
             seen = set()
             self.values = [arg for arg in args[0]
                            if not (arg in seen or seen.add(arg))]
@@ -63,6 +68,9 @@ class Set:
     def intercept(self, other):
         return Set([x for x in self.values + other.values if x in other.values and x in self.values])
 
+    def remove(self, item):
+        self.values.remove(item)
+
     def cross(self, other):
         return Set((p, q) for p in self for q in other)
 
@@ -89,6 +97,9 @@ class Set:
 
     def pop(self, index=-1):
         return self.values.pop(index)
+
+    def copy(self):
+        return Set(self.values)
 
     def __getitem__(self, key):
         return self.values[key]
@@ -149,7 +160,7 @@ regex = exp $
 exp      = term [+] exp      {push '+'}
          | term
          |                   empty?
-term     = factor term       chain {add \x08}
+term     = factor . term     chain {add .}
          | factor
 factor   = primary [*]       star {push '*'}
          | primary
@@ -215,3 +226,51 @@ def parseRegex(regexp):
 RegexParser https://xysun.github.io/posts/regex-parsing-thompsons-algorithm.html
 
 """
+
+
+class Rule:
+
+    def __init__(self, value):
+        self.chars = []
+
+        i = 0
+        bracketLevel = 0
+        inBracketWord = ""
+        while i < len(value):
+            if value[i] == "<":
+                bracketLevel += 1
+
+            elif value[i] == ">":
+                bracketLevel -= 1
+
+                if bracketLevel == 0:
+                    self.chars.append(inBracketWord)
+
+            elif bracketLevel == 0:
+                self.chars.append(value[i])
+
+            else:
+                inBracketWord += value[i]
+
+            i += 1
+
+    def __iter__(self):
+        return iter(self.chars)
+
+    def __getitem__(self, key):
+        return self.chars[key]
+
+    def __getattr__(self, attr):
+        return getattr(str(self), attr)
+
+    def __len__(self):
+        return len(self.chars)
+
+    def __eq__(self, other):
+        return set(self) == set(other)
+
+    def __hash__(self):
+        return sum(map(hash, self.chars))
+
+    def __repr__(self):
+        return "".join([f"<{char}>" if len(char) > 1 else char for char in self.chars])
