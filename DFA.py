@@ -6,6 +6,13 @@ import FA
 
 
 class DFA(FA.FA):
+    """
+    Deterministic finite automata
+
+    each transition can have only one transition under each
+    letter of the alphabet
+    """
+
     def __init__(self, Q, Σ, δ, q0, F):
         """
 
@@ -22,6 +29,19 @@ class DFA(FA.FA):
         self.δ.prepare(self.Q, self.Σ)
 
     def table(self):
+        """
+
+        create a table in this format:
+
+            +---+---+---+
+            |   | a | b |
+            +---+---+---+
+            | 1 | 2 | - |
+            | 2 | 2 | 1 |
+            +---+---+---+
+
+        """
+
         super().table_header("DETERMINISTIC FINITE AUTOMATA")
 
         widths = [max([len(key[0]) - key[0].count("̂") for key in self.δ])]
@@ -55,10 +75,11 @@ class DFA(FA.FA):
 
     def intersept(self, other):
         """
-        Q3 = Q1 × Q2
-        F3 = F1 × F2
-        q3 = (q1, q2)
-        δ3((p, q), a) = (δ1(p, a), δ2(q, a))
+        create a new DFA which has:
+            Q3 = Q1 × Q2
+            F3 = F1 × F2
+            q3 = (q1, q2)
+            δ3((p, q), a) = (δ1(p, a), δ2(q, a))
         """
 
         Q3 = self.Q.cross(other.Q)
@@ -80,10 +101,11 @@ class DFA(FA.FA):
 
     def union(self, other):
         """
-        Q3 = Q1 × Q2
-        F3 = F1 × Q2 ∪ Q1 × F2
-        q3 = (q1, q2)
-        δ3((p, q), a) = (δ1(p, a), δ2(q, a))
+        return a new DFA which has:
+            Q3 = Q1 × Q2
+            F3 = F1 × Q2 ∪ Q1 × F2
+            q3 = (q1, q2)
+            δ3((p, q), a) = (δ1(p, a), δ2(q, a))
         """
 
         M3 = self.intersept(other)
@@ -95,19 +117,20 @@ class DFA(FA.FA):
 
     def minimize(self):
         """
-        1. add hell if necessary
-        2. remove unreachable nodes
-        3. start reduction
-        4. order properly
+        in order to minimize folow these steps:
+            1. add hell if necessary
+            2. remove unreachable nodes
+            3. start reduction
+            4. order properly
         """
 
-        self.remove_unreachables()
-        self.add_hell()
-        minimized = self.reduce()
-        canonized = minimized.canonize()
+        self._remove_unreachables()
+        self._add_hell()
+        minimized = self._reduce()
+        canonized = minimized._canonize()
         return canonized
 
-    def remove_unreachables(self):
+    def _remove_unreachables(self):
         unreachables = self.δ.unreachables(self.q0)
 
         self.Q -= unreachables
@@ -119,7 +142,7 @@ class DFA(FA.FA):
 
         self.δ.Q = self.Q
 
-    def add_hell(self):
+    def _add_hell(self):
         addedHell = False
         for qi in self.Q:
             for a in self.Σ:
@@ -134,7 +157,7 @@ class DFA(FA.FA):
 
                 self.δ[qi, a] = "⊗"
 
-    def reduce(self, imax=None):
+    def _reduce(self, imax=None):
         from utils import roman
         import DFA
 
@@ -194,7 +217,7 @@ class DFA(FA.FA):
         F = Set(groups[qf] for qf in self.F)
         return DFA(Q, self.Σ, δ, q0, F)
 
-    def canonize(self):
+    def _canonize(self):
         import DFA
 
         Q = Set(chr(ord('A') + i) for i in range(len(self.Q)))
@@ -209,14 +232,89 @@ class DFA(FA.FA):
 
         return DFA(Q, self.Σ, δ, q0, F)
 
+    def toRE(self):
+        """
+
+        convert a DFA into regular expression
+        1. add start state START →ε q0
+           for each end state add qf →ε END
+        2. convert each transition
+            ...
+        """
+        import RE
+
+        δ = RE.δ({key: Set(val)
+                  for key, val in self.δ.items()
+                  if val != "-"}, Q=self.Q, Σ=self.Σ)
+
+        Q = self.Q.union(Set("START", "END"))
+        Σ = self.Σ.copy()
+        reg = RE(Q, Σ, δ, Set("START"), Set("END"))
+
+        δ["START", "ε"].add(self.q0)
+        for qf in self.F:
+            δ[qf, "ε"].add("END")
+
+        # remove unreachable nodes or dead-ends
+        for qi in self.Q:
+            if δ.toNode(qi).empty():
+                for key in δ.fromNode(qi):
+                    del δ[key]
+                continue
+            if δ.fromNode(qi).empty():
+                for key in δ.toNode(qi):
+                    del δ[key]
+                continue
+
+            fromNode = δ.fromNode(qi)
+            toNode = δ.toNode(qi)
+
+            # get loop
+            looping = Set(q for q in fromNode +
+                          toNode if q in fromNode and q in toNode)
+
+            # convert to F.(E)*.G
+            for (q_to, a_to) in toNode - looping:
+                for (q_from, a_from) in fromNode - looping:
+
+                    if not looping.empty():
+                        loop = "+".join([f"({a_loop})"
+                                         for (q_loop, a_loop) in looping])
+
+                        a = f"{a_to}.({loop})*.{a_from}"
+                        δ[q_to, a] |= (δ[q_from, a_from])
+
+                    else:
+                        a = f"{a_to}.{a_from}"
+                        δ[q_to, a] |= (δ[q_from, a_from])
+
+                    Σ.add(a)
+
+            for to_ in toNode - looping:
+                del δ[to_]
+            for from_ in fromNode - looping:
+                del δ[from_]
+            for loop in looping:
+                del δ[loop]
+
+        return reg
+
 
 class δ(FA.δ):
+    """
+    inherited from FA.δ, look there for more information
+    """
+
     def __getitem__(self, key):
         key = tuple(map(str, key))
         if key in self:
             return super().__getitem__(key)
 
     def reachables(self, q0):
+        """
+        return a list of all reachable qi states from the state q0
+        """
+
         result = Set()
         stack = [q0]
 
