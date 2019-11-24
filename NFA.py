@@ -6,6 +6,13 @@ import FA
 
 
 class NFA(FA.FA):
+    """
+    Non-Deterministic finite automata
+
+    each transition can have multiple transitions under same
+    letter of the alphabet
+    """
+
     def __init__(self, Q, Σ, δ, q0, F):
         """
 
@@ -21,6 +28,20 @@ class NFA(FA.FA):
         self.q0 = str(q0)
 
     def table(self):
+        """
+
+        create a table in this form:
+
+            +---+-----+--------+--------+--------+
+            |   |  a  |   b    |   c    |   d    |
+            +---+-----+--------+--------+--------+
+            | 1 |  Ø  |  {1}   |   Ø    |  {1}   |
+            | 2 |  Ø  |  {1,2} |  {2}   |   Ø    |
+            +---+-----+--------+--------+--------+
+
+
+        """
+
         super().table_header("NON-DETERMINISTIC FINITE AUTOMATA")
 
         widths = [max([len(key[0]) - key[0].count("̂") for key in self.δ])]
@@ -56,6 +77,9 @@ class NFA(FA.FA):
         super().table_body(print_content)
 
     def toDFA(self):
+        """
+        convert NFA to DFA
+        """
         import DFA
 
         def rename_state(state):
@@ -87,6 +111,10 @@ class NFA(FA.FA):
 
 
 class δ(FA.δ):
+    """
+    inherited from FA.δ, look there for more information
+    """
+
     def __setitem__(self, key, val):
         if len(key) == 2:
             super().__setitem__(tuple(map(str, key)), Set(map(str, val)))
@@ -100,16 +128,12 @@ class δ(FA.δ):
             self.__setitem__(key, Set())
         return super().__getitem__(key)
 
-    def prepare(self, Q, Σ):
-        self.Q = Q
-        self.Σ = Σ
-        for qi in Q:
-            for a in Σ:
-                if super().get((qi, a)) is None:
-                    super().__setitem__((qi, a), Set())
-
 
 class ô(FA.ô):
+    """
+    inherited from FA.δ, look there for more information
+    """
+
     def __getitem__(self, key):
         qi, word = key
 

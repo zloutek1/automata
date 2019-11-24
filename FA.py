@@ -82,8 +82,8 @@ class FA:
                 if target != "-":
                     G.edge(initial, target, label=value)
 
-            filename = "dfa" if filename is None else filename
-            G.render(filename, view=False)
+            filename = self.__class__.__name__ if filename is None else filename
+            G.render("images/" + filename, view=False)
 
         # add NFA transitions
         else:
@@ -95,8 +95,8 @@ class FA:
                 for target in targets:
                     G.edge(initial, str(target), label=value)
 
-            filename = "nfa" if filename is None else filename
-            G.render(filename, view=False)
+            filename = self.__class__.__name__ if filename is None else filename
+            G.render("images/" + filename, view=False)
 
     def __str__(self):
         return (f"A = ({self.Q}, {self.Σ}, δ, {self.I}, {self.F}) where\n" +
@@ -178,9 +178,15 @@ class δ(dict):
         return new_dict
 
     def toNode(self, qi):
+        """
+        get a list of transitions (q, a) that siffice δ[q, a] == qi
+        """
         return Set((p, a) for (p, a), q in self.items() for q2 in q if q2 == qi)
 
     def fromNode(self, qi):
+        """
+        get a list of transitions (q, a) that siffice δ[qi, a]
+        """
         return Set((p, a) for (p, a), q in self.items() if p == qi)
 
 

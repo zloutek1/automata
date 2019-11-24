@@ -7,6 +7,17 @@ import FA
 
 
 class RE(FA.FA):
+    """
+    Regular expression        (a+b)*.c
+        EFA with two nodes p ---------> q
+
+    symobls stand for:
+        +   for OR
+        ()* for (0 or more)
+        .   for THEN
+
+    """
+
     def __init__(self, Q, Σ, δ, I, F):
         """
 
@@ -116,7 +127,7 @@ class Or:
         self.right.eval(efa, qfrom, qto)
 
     def __repr__(self):
-        return f"({self.left}|{self.right})"
+        return f"({self.left}+{self.right})"
 
 
 @dataclass

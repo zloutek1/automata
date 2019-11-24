@@ -7,11 +7,30 @@ from NFA import NFA
 
 
 class EFA(NFA):
+    """
+    Non-Deterministic finite automata with ε steps
+
+    NFA where ε transition is allowed
+    """
+
     def __init__(self, Q, Σ, δ, q0, F):
         Σ += Set("ε")
         super().__init__(Q, Σ, δ, q0, F)
 
     def table(self):
+        """
+
+        create a table in this form:
+
+            +---+-----+-----+-----+-----+-----+-----------+
+            |   |  a  |  b  |  c  |  d  |  ε  |     Dε    |
+            +---+-----+-----+-----+-----+-----+-----------+
+            | 1 |  Ø  |  Ø  |  Ø  |  Ø  | {1} |   {1, 2}  |
+            | 2 | {2} |  Ø  |  Ø  | {1} | {2} |   {2, 1}  |
+            +---+-----+-----+-----+-----+-----+-----------+
+
+
+        """
         super().table_header("NON-DETERMINISTIC FINITE AUTOMATA with ε steps")
 
         widths = [max([len(key[0]) - key[0].count("̂") for key in self.δ])]
@@ -47,6 +66,10 @@ class EFA(NFA):
         super().table_body(print_content)
 
     def toNFA(self):
+        """
+        convert EFA to DFA
+            remove ε steps
+        """
         import NFA
 
         δ = NFA.δ(Q=self.Q, Σ=self.Σ)
@@ -74,10 +97,18 @@ class EFA(NFA):
         return NFA(self.Q, Σ, δ, self.q0, F)
 
     def toDFA(self):
+        """
+        convert to EFA to DFA
+            shortcut by converting it to NFA first
+        """
         return self.toNFA().toDFA()
 
 
 class δ(FA.δ):
+    """
+    inherited from FA.δ, look there for more information
+    """
+
     def __setitem__(self, key, val):
         if len(key) == 2:
             super().__setitem__(tuple(map(str, key)), Set(map(str, val)))
@@ -105,6 +136,10 @@ class δ(FA.δ):
 
 
 class ô(δ, FA.ô):
+    """
+    inherited from FA.δ, look there for more information
+    """
+
     def __getitem__(self, key):
         qi, word = key
 

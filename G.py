@@ -5,10 +5,30 @@ from utils import Set
 
 
 class G:
+    """
+    Regular grammar
+
+    each transition must follow rules
+    A -> a    A ∈ N,   a ∈ Σ
+    A -> aB   A,B ∈ N, a ∈ Σ
+    """
+
     def __init__(self, N, Σ, P, S):
+        """
+        N : set of states
+        Σ : finite alphabet
+        P : N × Σ → N transition function
+        S : S ∈ N initial state
+        """
+
+        if not isinstance(N, Set):
+            raise ValueError("N must be set of strings")
+        if not isinstance(Σ, Set):
+            raise ValueError("N must be set of strings")
+
         self.__dict__.update({
-            "N": Set(map(str, N)),
-            "Σ": Set(list(Σ)),
+            "N": N,
+            "Σ": Σ,
             "P": P,
             "S": str(S)})
 
@@ -21,6 +41,12 @@ class G:
         return f"{_name}({', '.join(str(key)+'='+', '.join(val) for key,val in self.__dict__.items())})"
 
     def toNFA(self):
+        """
+        convert Grammar to NFA
+            1. rule A -> aB convert to δ[Ā, a] = B̄
+            2. rule A -> a  convert to δ[Ā, a] = qf
+            3. S̄ ∈ F if there is a rule S -> ε
+        """
         import NFA
 
         Q = Set(f"{A}̄" for A in self.N).union(Set("qf"))
@@ -44,6 +70,17 @@ class G:
 
 
 class P(dict):
+    """
+
+    add transition in formats
+    P({
+        "S": "aA | a",
+        "A": "b | bA"
+    })
+
+    P["S"].add("aA")
+
+    """
     def __init__(self, *args, **kwargs):
         if (len(args) == 1 and isinstance(args[0], dict)):
             for k, v in args[0].items():
@@ -53,7 +90,7 @@ class P(dict):
             super().__init__(*args, **kwargs)
 
     def __setitem__(self, key, value):
-        super().__setitem__(key, list(map(str.strip, value.split("|"))))
+        super().__setitem__(key, Set(map(str.strip, value.split("|"))))
 
 
 class call(types.ModuleType):
