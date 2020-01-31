@@ -51,7 +51,8 @@ class DFA(FA.FA):
 
         data = [("", *self.Σ)]
         for qi in self.Q:
-            data.append([qi] + [self.δ.get((qi, a), "-") for a in self.Σ])
+            data.append([qi] + [str(self.δ.get((qi, a), "Ø")[0])
+                                for a in self.Σ])
 
         def sep():
             print("+" + "+".join([f"-{'-' * w}-" for w in widths]) + "+")
@@ -124,10 +125,10 @@ class DFA(FA.FA):
             4. order properly
         """
 
-        self._remove_unreachables()
         self._add_hell()
-        minimized = self._reduce()
-        canonized = minimized._canonize()
+        self._remove_unreachables()
+        reduced = self._reduce()
+        canonized = reduced._canonize()
         return canonized
 
     def _remove_unreachables(self):
@@ -151,9 +152,9 @@ class DFA(FA.FA):
 
                 if not addedHell:
                     addedHell = True
+                    self.Q.add("⊗")
                     for a2 in self.Σ:
                         self.δ["⊗", a2] = "⊗"
-                    self.Q.add("⊗")
 
                 self.δ[qi, a] = "⊗"
 
@@ -196,7 +197,7 @@ class DFA(FA.FA):
                 force_move += len(numeratd_patterns)
                 numeratd_patterns = []
 
-            new_δ = DFA.δ(Q=self.Q, Σ=self.Σ)
+            new_δ = DFA.δ()
             for qi in self.Q:
                 for a in self.Σ:
                     new_δ[qi, a] = new_groups.get(self.δ[qi, a])
@@ -210,7 +211,7 @@ class DFA(FA.FA):
         Q = Set(groups.values())
         q0 = groups[self.q0]
 
-        δ = DFA.δ(Q=Q, Σ=self.Σ)
+        δ = DFA.δ()
         for (qi, a), target in new_δ.items():
             δ[groups[qi], a] = target
 
@@ -223,7 +224,7 @@ class DFA(FA.FA):
         Q = Set(chr(ord('A') + i) for i in range(len(self.Q)))
         letterMapping = dict(zip(self.δ.reachables(self.q0), Q))
 
-        δ = DFA.δ(Q=Q, Σ=self.Σ)
+        δ = DFA.δ()
         for (qi, a), target in self.δ.items():
             δ[letterMapping[qi], a] = letterMapping[target]
 
@@ -232,72 +233,13 @@ class DFA(FA.FA):
 
         return DFA(Q, self.Σ, δ, q0, F)
 
-    def toRE(self):
-        """
-
-        convert a DFA into regular expression
-        1. add start state START →ε q0
-           for each end state add qf →ε END
-        2. convert each transition
-            ...
-        """
-        import RE
-
-        δ = RE.δ({key: Set(val)
-                  for key, val in self.δ.items()
-                  if val != "-"}, Q=self.Q, Σ=self.Σ)
-
-        Q = self.Q.union(Set("START", "END"))
-        Σ = self.Σ.copy()
-        reg = RE(Q, Σ, δ, Set("START"), Set("END"))
-
-        δ["START", "ε"].add(self.q0)
-        for qf in self.F:
-            δ[qf, "ε"].add("END")
-
-        # remove unreachable nodes or dead-ends
-        for qi in self.Q:
-            if δ.toNode(qi).empty():
-                for key in δ.fromNode(qi):
-                    del δ[key]
-                continue
-            if δ.fromNode(qi).empty():
-                for key in δ.toNode(qi):
-                    del δ[key]
-                continue
-
-            fromNode = δ.fromNode(qi)
-            toNode = δ.toNode(qi)
-
-            # get loop
-            looping = Set(q for q in fromNode +
-                          toNode if q in fromNode and q in toNode)
-
-            # convert to F.(E)*.G
-            for (q_to, a_to) in toNode - looping:
-                for (q_from, a_from) in fromNode - looping:
-
-                    if not looping.empty():
-                        loop = "+".join([f"({a_loop})"
-                                         for (q_loop, a_loop) in looping])
-
-                        a = f"{a_to}.({loop})*.{a_from}"
-                        δ[q_to, a] |= (δ[q_from, a_from])
-
-                    else:
-                        a = f"{a_to}.{a_from}"
-                        δ[q_to, a] |= (δ[q_from, a_from])
-
-                    Σ.add(a)
-
-            for to_ in toNode - looping:
-                del δ[to_]
-            for from_ in fromNode - looping:
-                del δ[from_]
-            for loop in looping:
-                del δ[loop]
-
-        return reg
+    def test(self, word):
+        word = list(word)
+        qi = self.q0
+        while len(word) > 0:
+            a = word.pop(0)
+            qi = self.δ[qi, a]
+        return qi in self.F
 
 
 class δ(FA.δ):
@@ -305,10 +247,21 @@ class δ(FA.δ):
     inherited from FA.δ, look there for more information
     """
 
+    def __setitem__(self, key, val):
+        if val == "-":
+            return  # no path
+
+        q, a = map(str, key)
+        super().__setitem__((q, a), Set(str(val)))
+
     def __getitem__(self, key):
         key = tuple(map(str, key))
-        if key in self:
-            return super().__getitem__(key)
+        if key not in self:
+            return "-"
+        return super().__getitem__(key)[0]
+
+    def items(self):
+        return list((k, v[0]) for k, v in super().items())
 
     def reachables(self, q0):
         """
@@ -323,7 +276,7 @@ class δ(FA.δ):
             result.add(q)
             for a in self.Σ:
                 target = self.__getitem__((q, a))
-                if target != "-":
+                if target is not None:
                     if target not in result:
                         stack.append(target)
                     result.add(target)
@@ -331,7 +284,7 @@ class δ(FA.δ):
         return result
 
     def unreachables(self, q0):
-        return self.Q - self.reachables(q0)
+        return self.fa.Q - self.reachables(q0)
 
 
 class call(types.ModuleType):
