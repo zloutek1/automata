@@ -182,10 +182,9 @@ def test_cfg():
         "B": "aSS | bA | aB"
     })
     G = CFG(Set("S", "A", "B"), Set("a", "b"), P, "S")
-    M = G.toTopDownAnalyzer()
-
-    N = G.toBottomUpAnalyzer()
-    print(N.analyze("ababaa"))
+    # M = G.toTopDownAnalyzer()
+    # N = G.toBottomUpAnalyzer()
+    # print(N.analyze("ababaa"))
 
 
 def test_pda():
