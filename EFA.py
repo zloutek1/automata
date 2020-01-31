@@ -72,7 +72,7 @@ class EFA(NFA):
         """
         import NFA
 
-        δ = NFA.δ(Q=self.Q, Σ=self.Σ)
+        δ = NFA.δ()
         for qi in self.Q:
             for a in self.Σ:
                 if a == "ε":
@@ -102,6 +102,9 @@ class EFA(NFA):
             shortcut by converting it to NFA first
         """
         return self.toNFA().toDFA()
+
+    def test(self, word):
+        return self.toDFA().test(word)
 
 
 class δ(FA.δ):

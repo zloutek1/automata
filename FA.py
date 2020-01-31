@@ -6,20 +6,30 @@ class FA:
     def __init__(self, Q, Σ, δ, I, F):
         """
 
-        Q  : set of states
-        Σ  : finite alphabet
-        δ  : Q × Σ → Q transition function
+        Q : set of states
+        Σ : finite alphabet
+        δ : Q × Σ → Q transition function
         I : I ⊆ Q set of initial states
-        F  : F ⊆ Q set of accepting states
+        F : F ⊆ Q set of accepting states
 
         """
+        import FA
+
+        assert isinstance(Q, Set), "Q must be a Set of states"
+        assert isinstance(Σ, Set), "Σ must be a Set of alphabet"
+        assert isinstance(
+            δ, FA.δ), f"δ must be a transition function FA.δ, but is {type(δ)}"
+        assert isinstance(I, Set), "I must be a Set of initial states"
+        assert all(q0 in Q for q0 in I) or I.empty(
+        ), f"condition I ⊆ Q not met, element of {I} not in {Q}"
+        assert isinstance(F, Set), "F must be a Set of accepting states"
+        assert all(qf in Q for qf in F) or F.empty(
+        ), f"condition F ⊆ Q not met, element of {F} not in {Q}"
 
         self.__dict__.update({
-            "Q": Set(map(str, Q)),
-            "Σ": Set(list(Σ)),
-            "δ": δ,
-            "I": Set(map(str, I)),
-            "F": Set(map(str, F))})
+            "Q": Q.map(str), "Σ": Σ.map(str), "δ": δ, "I": I.map(str), "F": F.map(str)})
+
+        self.δ.fa = self
 
     def table_header(self, text):
         """
@@ -76,7 +86,7 @@ class FA:
         if self.__class__.__name__ == "DFA":
             G.attr('node', shape='circle')
             for key in δ:
-                target = δ.get(key)
+                target = δ.get(key)[0]
                 initial = key[0]
                 value = key[1]
                 if target != "-":
@@ -119,27 +129,14 @@ class δ(dict):
 
     """
 
-    Q = Set()
-    Σ = Set()
-
-    def __init__(self, *args, Q=None, Σ=None, **kwargs):
-        if Q is not None:
-            self.Q = Q
-        if Σ is not None:
-            self.Σ = Σ
+    def __init__(self, *args, automata=None, **kwargs):
+        self.fa = automata
 
         super().__init__(*args, **kwargs)
 
     def __setitem__(self, key, val):
-        if len(key) == 2:
-            if isinstance(val, Iterable):
-                super().__setitem__(tuple(map(str, key)), val)
-            else:
-                super().__setitem__(tuple(map(str, key)), str(val))
-
-        elif len(key) > 2 and len(key) == len(val) + 1:
-            for k, v in zip(key[1:], val):
-                self.__setitem__((key[0], k), v)
+        q, a = map(str, key)
+        super().__setitem__((q, a), val.map(str))
 
     def __getitem__(self, key):
         if key not in self:
