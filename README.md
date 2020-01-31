@@ -43,3 +43,16 @@
 
 ### graph
 ![graph](https://graphviz.gitlab.io/_pages/Gallery/directed/fsm.png)
+
+## features added (so far)
++ minimize DFA
++ convert NFA to DFA
++ convert EFA to NFA
++ convert Grammar to NFA
++ reduce CFG
++ remove ε steps from CFG
++ convert CFG to "own" grammar (not sure by the translation)
++ convert CFG to CNF (Chomsky's normal form)
++ remove left recursion from CFG
++ convert CFG to GNF (Greibach's normal form)
++ construct analyzer PDA's from CFG
