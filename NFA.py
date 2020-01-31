@@ -88,7 +88,7 @@ class NFA(FA.FA):
 
         q0 = rename_state(Set(self.q0))
         Q = Set(Set(self.q0))
-        δ = DFA.δ(Σ=self.Σ)
+        δ = DFA.δ()
         F = Set()
         Done = Set()
 
@@ -99,15 +99,18 @@ class NFA(FA.FA):
             for a in self.Σ:
                 N = Set.Union([self.δ[p, a] for p in M])
                 Q = Q.union(Set(N))
-                δ[M, a] = N
+                δ[rename_state(M), a] = rename_state(N)
             Done = Done.union(Set(M))
 
         Q = Set([rename_state(qi) for qi in Q])
-        δ = DFA.δ({(rename_state(qi), a): rename_state(target)
-                   for (qi, a), target in δ.items()}, Q=Q, Σ=self.Σ)
+        δ = DFA.δ({(qi, a): Set(target)
+                   for (qi, a), target in δ.items()})
         F = Set([rename_state(qf) for qf in F])
 
         return DFA(Q, self.Σ, δ, q0, F)
+
+    def test(self, word):
+        return self.toDFA().test(word)
 
 
 class δ(FA.δ):

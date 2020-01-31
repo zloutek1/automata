@@ -69,8 +69,9 @@ class RE(FA.FA):
             print(regexp_to_postfix(a))
         """
 
-        δ = EFA.δ(Q=self.Q, Σ=self.Σ)
-        efa = EFA(self.Q, self.Σ, δ, "START", Set("END"))
+        Q = self.Q.union(Set("START", "END"))
+        δ = EFA.δ()
+        efa = EFA(Q, self.Σ, δ, "START", Set("END"))
 
         for qs in self.I:
             δ["START", "ε"] = qs
@@ -81,7 +82,8 @@ class RE(FA.FA):
         for (qfrom, a), qto in self.δ.items():
             tokens = parseRegex(a)
             ast = toAST(tokens)
-            ast.eval(efa, qfrom, qto)
+            for qi in qto:
+                ast.eval(efa, qfrom, qi)
 
         return efa
 

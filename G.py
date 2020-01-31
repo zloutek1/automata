@@ -81,6 +81,7 @@ class P(dict):
     P["S"].add("aA")
 
     """
+
     def __init__(self, *args, **kwargs):
         if (len(args) == 1 and isinstance(args[0], dict)):
             for k, v in args[0].items():
