@@ -2,6 +2,7 @@ import sys
 import types
 
 from utils import Set, all_subsets, Rule
+from Analyzer import TopDownAnalyzer, BottomUpAnalyzer
 
 
 class CFG:
@@ -219,6 +220,7 @@ class CFG:
             for rule in G.P.get(A, P[A]):
                 A = N[i]
                 if len(rule) >= 2:
+                    # change rule A -> abcd... to A -> a<bcd...>
                     B, *C = rule
 
                     B1 = Rule(B if B.isupper() else f"{B}̄")
@@ -228,21 +230,21 @@ class CFG:
 
                     P[A].add(Rule(f"{B1}{C1}"))
 
-                    A = Rule(f"<{C1[0]}>")
-                    rule = Rule(f"{C1[0][0]}<{C1[0][1:]}>")
+                    A = Rule(f"{C1[0]}")
 
-                    while len(A[0]) >= 2:
+                    # continue generating <bcd...> -> b<cd...>
+                    while len(A[0]) >= 2 and A[0] != "<>":
+                        rule = Rule(f"{C1[0][1]}<{C1[0][2:-1]}>")
                         B, *C = rule
 
                         B1 = Rule(B if B.isupper() else f"{B}̄")
-                        C1 = Rule((f"<{''.join(C[0])}>" if len(C[0]) > 1 else
+                        C1 = Rule((f"{''.join(C[0])}" if len(C[0]) > 1 else
                                    C[0] if C[0].isupper() else
                                    f"{C[0]}̄"))
 
                         P[A].add(Rule(f"{B1}{C1}"))
 
-                        A = Rule(f"<{C1[0]}>")
-                        rule = Rule(f"{C1[0][0]}<{C1[0][1:]}>")
+                        A = Rule(f"{C1[0]}")
 
                 else:
                     P[A].add(Rule(rule))
@@ -250,6 +252,114 @@ class CFG:
             i += 1
 
         return CFG(N, self.Σ, P, self.S)
+
+    def remove_left_recursion(self):
+        def calc_potentials():
+            potentials = {}
+            for A in N:
+                potentials.setdefault(A, Set())
+                for rule in P[A]:
+                    if rule[0] in N:
+                        potentials[A].add(rule[0])
+            return potentials
+
+        N = self.N.copy()
+        P = self.P.copy()
+
+        for i, A in enumerate(N):
+            for B in N[:i + 1]:
+                if not B in calc_potentials()[A]:
+                    continue
+
+                if A == B:
+                    α = [rule for rule in P[A] if rule.startswith(B)]
+                    β = [rule for rule in P[A] if not rule.startswith(B)]
+                    N = Set(f"{A}'").union(N)
+                    P[f"{A}'"] |= Set(Rule(rule[1:]) for rule in α) | Set(
+                        Rule(rule[1:] + f"{A}'") for rule in α)
+                    P[A] = Set(Rule(rule) for rule in β) | Set(
+                        Rule(rule + f"{A}'") for rule in β)
+
+                else:
+                    α = [rule for rule in P[A] if rule.startswith(B)]
+                    β = [rule for rule in P[A] if not rule.startswith(B)]
+                    P[A] = Set(Rule(rule) for rule in β) | Set(
+                        Rule(ruleB + rule[1:]) for rule in α for ruleB in P[B])
+
+        return CFG(N, self.Σ.copy(), P, self.S)
+
+    def toGNF(self):
+        """
+        each rule must be of format
+        A → aB1B2B3...Bn   (a ∈ Σ, B1,B2,B3,...,Bn ∈ N)
+        """
+        import CFG
+
+        G = self.remove_left_recursion()
+        N = Set(reversed(G.N.copy()))
+        P = G.P.copy()
+
+        def resolve(A, B):
+            for _ in range(len(P[A])):
+                rule = list(P[A].pop(0))
+                if rule[0].islower():
+                    for i, c in enumerate(rule[1:]):
+                        if c.islower() and len(c) == 1:
+                            rule[i + 1] = f"{c}̄"
+
+                    rule = "".join(rule)
+                    P[A].add(Rule(rule))
+
+                elif rule[0] == B:
+                    rules = Set()
+                    for rule1 in P[B]:
+                        rules.add(Rule(rule1 + "".join(rule[1:])))
+                    P[A] |= rules
+
+                else:
+                    P[A].add(Rule(rule))
+
+        for i, A in enumerate(N):
+            for B in N[:i + 1]:
+                resolve(A, B)
+
+        return CFG(N, self.Σ, P, self.S)
+
+    def toTopDownAnalyzer(self):
+        import PDA
+        L = self.remove_left_recursion()
+
+        δ = PDA.δ()
+        M = TopDownAnalyzer(Set("q"), L.Σ, L.N.union(L.Σ), δ, "q", L.S, Set())
+
+        for A in L.N:
+            for rule in L.P[A]:
+                δ["q", "ε", A].add(("q", rule))
+
+        for a in L.Σ:
+            δ["q", a, a].add(("q", "ε"))
+
+        return M
+
+    def toBottomUpAnalyzer(self):
+        import PDA
+        # L = self.remove_left_recursion()
+        L = self
+
+        ô = PDA.ô()
+        M = BottomUpAnalyzer(Set("q", "r"), L.Σ, L.N | L.Σ |
+                             Set("⊥"), ô, "q", "⊥", Set("r"))
+
+        for A in L.N:
+            for rule in L.P[A]:
+                ô["q", "ε", rule].add(("q", A))
+
+        for a in L.Σ:
+            ô["q", a, "ε"].add(("q", a))
+
+        ô["q", "ε", "⊥S"].add(("r", "ε"))
+
+        return M
 
     def __getattr__(self, key):
         if key.startswith("N") and key[1:] in self.N:
@@ -285,6 +395,9 @@ class P(dict):
         if key not in self:
             super().__setitem__(key, Set())
         return super().__getitem__(key)
+
+    def copy(self):
+        return P(super().copy())
 
 
 class call(types.ModuleType):
