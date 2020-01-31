@@ -35,7 +35,7 @@ class Set:
 
     def __init__(self, *args):
 
-        if len(args) == 1 and isinstance(args[0], Iterable) and type(args[0]) not in (Set, str, Rule):
+        if len(args) == 1 and isinstance(args[0], Iterable) and type(args[0]) not in (Set, str, tuple, Rule):
             seen = set()
             self.values = [arg for arg in args[0]
                            if not (arg in seen or seen.add(arg))]
@@ -44,6 +44,10 @@ class Set:
             seen = set()
             self.values = [arg for arg in args
                            if not (arg in seen or seen.add(arg))]
+
+    def map(self, func):
+        self.values = list(map(func, self.values))
+        return self
 
     @classmethod
     def Union(set, sets):
@@ -231,33 +235,42 @@ RegexParser https://xysun.github.io/posts/regex-parsing-thompsons-algorithm.html
 class Rule:
 
     def __init__(self, value):
-        self.chars = []
+        chars = list(value)
 
         i = 0
-        bracketLevel = 0
-        inBracketWord = ""
-        while i < len(value):
-            if value[i] == "<":
-                bracketLevel += 1
+        while i < len(chars) - 1:
+            if (chars[i + 1] in ('̂', '̄', "\'")):
+                joined = "".join(chars[i:i + 2])
+                chars[i] = joined
+                del chars[i + 1]
 
-            elif value[i] == ">":
-                bracketLevel -= 1
+            if chars[i] == '<':
+                bracketLevel = 0
+                bracketChars = []
+                j = i
+                while j < len(chars):
+                    bracketChars += value[j]
+                    if chars[j] == '<':
+                        bracketLevel += 1
+                    elif chars[j] == '>':
+                        bracketLevel -= 1
+                        if bracketLevel == 0:
+                            break
+                    j += 1
 
-                if bracketLevel == 0:
-                    self.chars.append(inBracketWord)
-
-            elif bracketLevel == 0:
-                self.chars.append(value[i])
-
-            else:
-                inBracketWord += value[i]
-
+                chars[i] = "".join(bracketChars)
+                for j in range(1, len(bracketChars)):
+                    del chars[i + 1]
             i += 1
+
+        self.chars = chars
 
     def __iter__(self):
         return iter(self.chars)
 
     def __getitem__(self, key):
+        if isinstance(self.chars[key], list):
+            return "".join(self.chars[key])
         return self.chars[key]
 
     def __getattr__(self, attr):
@@ -272,5 +285,40 @@ class Rule:
     def __hash__(self):
         return sum(map(hash, self.chars))
 
+    def __add__(self, other):
+        return Rule(self.chars + list(other))
+
     def __repr__(self):
-        return "".join([f"<{char}>" if len(char) > 1 else char for char in self.chars])
+        return "".join([char for char in self.chars])
+
+
+class Stack:
+    def __init__(self, *items):
+        self.values = [*items]
+
+    def top(self):
+        return self.values[-1]
+
+    def pop(self):
+        return self.values.pop()
+
+    def push(self, item):
+        self.values.append(item)
+
+    def __len__(self):
+        return len(self.values)
+
+    def size(self):
+        return len(self)
+
+    def empty(self):
+        return self.size() == 0
+
+    def copy(self):
+        return Stack(*self.values)
+
+    def reverse(self):
+        return Stack(*reversed(self.values))
+
+    def __repr__(self):
+        return f"[{''.join(self.values[::-1])}]"
